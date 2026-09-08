@@ -1,4 +1,4 @@
-use koopa::back::LlvmGenerator;
+use koopa::back::KoopaGenerator;
 use koopa::ir::builder::{BasicBlockBuilder, LocalInstBuilder, ValueBuilder};
 use koopa::ir::{Program, Type};
 use lalrpop_util::lalrpop_mod;
@@ -23,7 +23,7 @@ fn main() -> Result<()> {
     let input = read_to_string(input)?;
     let ast = sysy::CompUnitParser::new().parse(&input).unwrap();
     let program = generate_ir(ast);
-    let mut g = LlvmGenerator::from_path(output)?;
+    let mut g = KoopaGenerator::from_path(output)?;
     g.generate_on(&program)?;
     Ok(())
 }
@@ -34,8 +34,10 @@ fn generate_ir(ast: CompUnit) -> Program {
     let ret_type = match func_def.func_type {
         types::FuncType::Int => Type::get_i32(),
     };
+
     let func = program.new_func_def(format!("@{}", func_def.ident), Vec::new(), ret_type);
     let func_data = program.func_mut(func);
+
     let entry = func_data
         .dfg_mut()
         .new_bb()
