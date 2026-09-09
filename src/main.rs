@@ -1,6 +1,7 @@
+use crate::generate::generate_exp;
 use koopa::back::KoopaGenerator;
-use koopa::ir::builder::{BasicBlockBuilder, LocalInstBuilder, ValueBuilder};
-use koopa::ir::{FunctionData, Program, Type, ValueKind};
+use koopa::ir::builder::{BasicBlockBuilder, LocalInstBuilder};
+use koopa::ir::{Program, Type, ValueKind};
 use lalrpop_util::lalrpop_mod;
 use std::env::args;
 use std::fmt::Write;
@@ -9,6 +10,7 @@ use std::io::Result;
 
 use crate::types::CompUnit;
 
+mod generate;
 mod types;
 
 lalrpop_mod!(sysy);
@@ -91,11 +93,9 @@ fn generate_ir(ast: CompUnit) -> Program {
         .basic_block(Some("%entry".into()));
     func_data.layout_mut().bbs_mut().extend([entry]);
 
-    let value = func_data
-        .dfg_mut()
-        .new_value()
-        .integer(func_def.block.stmt.num);
+    let value = generate_exp(&func_def.block.stmt.exp, func_data, entry);
     let ret = func_data.dfg_mut().new_value().ret(Some(value));
+
     func_data
         .layout_mut()
         .bb_mut(entry)

@@ -26,5 +26,29 @@ type Number = i32;
 
 #[derive(Debug)]
 pub struct Stmt {
-    pub num: Number,
+    pub exp: Exp,
+}
+
+#[derive(Debug)]
+pub struct Exp {
+    pub unary: UnaryExp,
+}
+
+#[derive(Debug)]
+pub enum UnaryOp {
+    Plus,
+    Minus,
+    Not,
+}
+
+#[derive(Debug)]
+pub enum PrimaryExp {
+    Parenthesized(Box<Exp>),
+    Number(Number),
+}
+
+#[derive(Debug)]
+pub enum UnaryExp {
+    Primary(PrimaryExp),
+    Unary { op: UnaryOp, expr: Box<UnaryExp> },
 }
