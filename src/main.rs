@@ -1,8 +1,9 @@
 use koopa::back::KoopaGenerator;
 use koopa::ir::builder::{BasicBlockBuilder, LocalInstBuilder, ValueBuilder};
-use koopa::ir::{Program, Type};
+use koopa::ir::{FunctionData, Program, Type, ValueKind};
 use lalrpop_util::lalrpop_mod;
 use std::env::args;
+use std::fmt::Write;
 use std::fs::read_to_string;
 use std::io::Result;
 
@@ -15,17 +16,63 @@ lalrpop_mod!(sysy);
 fn main() -> Result<()> {
     let mut args = args();
     args.next();
-    let _mode = args.next().unwrap();
+    let mode = args.next().unwrap();
+
     let input = args.next().unwrap();
     args.next();
     let output = args.next().unwrap();
 
-    let input = read_to_string(input)?;
-    let ast = sysy::CompUnitParser::new().parse(&input).unwrap();
-    let program = generate_ir(ast);
-    let mut g = KoopaGenerator::from_path(output)?;
-    g.generate_on(&program)?;
+    if mode.eq("-koopa") {
+        let input = read_to_string(input)?;
+        let ast = sysy::CompUnitParser::new().parse(&input).unwrap();
+        let program = generate_ir(ast);
+        let mut g = KoopaGenerator::from_path(&output)?;
+        g.generate_on(&program)?;
+    } else if mode.eq("-riscv") {
+        let input = read_to_string(input)?;
+        let ast = sysy::CompUnitParser::new().parse(&input).unwrap();
+        let program = generate_ir(ast);
+        generate_asm(&program, &output)?;
+    }
+
     Ok(())
+}
+
+fn generate_asm(program: &Program, output: &str) -> Result<()> {
+    let mut asm = String::new();
+    writeln!(&mut asm, "  .text").unwrap();
+    for &func in program.func_layout() {
+        let func_data = program.func(func);
+        let name = func_data.name();
+        let name = name.strip_prefix('@').unwrap_or(name);
+        writeln!(&mut asm, "  .globl {}", name).unwrap();
+        writeln!(&mut asm, "{}:", name).unwrap();
+        for (&bb, node) in func_data.layout().bbs() {
+            for &inst in node.insts().keys() {
+                let value_data = func_data.dfg().value(inst);
+                match value_data.kind() {
+                    ValueKind::Return(ret) => {
+                        let ret_value = ret.value();
+                        if ret_value.is_some() {
+                            let v = func_data.dfg().value(ret_value.unwrap());
+                            match v.kind() {
+                                ValueKind::Integer(v) => ret_i32_asm(v.value(), &mut asm),
+                                _ => unreachable!(),
+                            }
+                        }
+                    }
+                    _ => unreachable!(),
+                }
+            }
+        }
+    }
+    std::fs::write(output, &asm)?;
+    Ok(())
+}
+
+fn ret_i32_asm(ret: i32, asm: &mut String) {
+    writeln!(asm, "  li a0, {}", ret).unwrap();
+    writeln!(asm, "  ret").unwrap();
 }
 
 fn generate_ir(ast: CompUnit) -> Program {
