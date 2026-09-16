@@ -53,20 +53,27 @@ fn generate_asm(program: &Program, output: &str) -> Result<()> {
         writeln!(&mut asm, "{}:", name).unwrap();
         for (&bb, node) in func_data.layout().bbs() {
             let mut vreg_manager = VRegManager::new();
-            let allocator = RegAllocator::new();
+            let mut allocator = RegAllocator::new();
             for &inst in node.insts().keys() {
                 let value_data = func_data.dfg().value(inst);
+                println!("data: {:?}", value_data);
                 match value_data.kind() {
                     ValueKind::Return(ret) => {
                         let ret_value = ret.value();
                         if ret_value.is_some() {
-                            let v = func_data.dfg().value(ret_value.unwrap());
-                            match v.kind() {
-                                ValueKind::Integer(v) => ret_i32_asm(v.value(), &mut asm),
-                                _ => unreachable!(),
-                            }
+                            let vreg = vreg_manager.emit_ret(ret_value.unwrap());
+                            vreg_manager.insert(ret_value.unwrap(), vreg);
+                        } else {
+                            vreg_manager.emit_ret_void();
                         }
                     }
+
+                    ValueKind::Integer(val) => {
+                        let v = val.value();
+                        let result = vreg_manager.emit_constant(v);
+                        vreg_manager.insert(inst, result);
+                    }
+
                     ValueKind::Binary(val) => {
                         let op = val.op();
                         let op = match op {
@@ -78,7 +85,7 @@ fn generate_asm(program: &Program, output: &str) -> Result<()> {
                         let lr =
                             vreg_manager.operand_reg(val.lhs(), func_data.dfg().value(val.lhs()));
                         let rr =
-                            vreg_manager.operand_reg(val.rhs(), func_data.dfg().value(val.lhs()));
+                            vreg_manager.operand_reg(val.rhs(), func_data.dfg().value(val.rhs()));
                         let result = vreg_manager.emit_binary(op, lr, rr);
 
                         vreg_manager.insert(inst, result);
@@ -86,6 +93,8 @@ fn generate_asm(program: &Program, output: &str) -> Result<()> {
                     _ => unreachable!(),
                 }
             }
+            let last_use = vreg_manager.last_use();
+            allocator.scan_block(last_use, vreg_manager.block(), &mut asm);
         }
     }
     std::fs::write(output, &asm)?;
