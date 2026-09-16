@@ -31,7 +31,7 @@ pub struct Stmt {
 
 #[derive(Debug)]
 pub struct Exp {
-    pub unary: UnaryExp,
+    pub expr: AddExp,
 }
 
 #[derive(Debug)]
@@ -39,6 +39,19 @@ pub enum UnaryOp {
     Plus,
     Minus,
     Not,
+}
+
+#[derive(Debug)]
+pub enum MulOp {
+    Mul,
+    Div,
+    Mod,
+}
+
+#[derive(Debug)]
+pub enum AddOp {
+    Plus,
+    Minus,
 }
 
 #[derive(Debug)]
@@ -51,4 +64,24 @@ pub enum PrimaryExp {
 pub enum UnaryExp {
     Primary(PrimaryExp),
     Unary { op: UnaryOp, expr: Box<UnaryExp> },
+}
+
+#[derive(Debug)]
+pub enum MulExp {
+    Unary(UnaryExp),
+    Mul {
+        mulexpr: Box<MulExp>,
+        op: MulOp,
+        expr: Box<UnaryExp>,
+    },
+}
+
+#[derive(Debug)]
+pub enum AddExp {
+    Mul(MulExp),
+    Add {
+        addexpr: Box<AddExp>,
+        op: AddOp,
+        expr: Box<MulExp>,
+    },
 }

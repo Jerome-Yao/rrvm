@@ -30,7 +30,7 @@ Block: Block = "{" <stmt: Stmt> "}" => Block {<>};
 
 Stmt: Stmt = "return" <exp: Exp> ";" => Stmt {<>};
 
-Exp: Exp = <unary: UnaryExp> => Exp {<>};
+Exp: Exp = <expr: AddExp> => Exp {<>};
 
 UnaryOp: UnaryOp = {
   "+" => UnaryOp::Plus,
@@ -47,6 +47,27 @@ UnaryExp: UnaryExp = {
   <op: UnaryOp> <exp: UnaryExp> => UnaryExp::Unary{op, expr: Box::new(exp)}  ,
   <primary: PrimaryExp> => UnaryExp::Primary(primary),
 };
+
+MulOp: MulOp = {
+  "*" => MulOp::Mul,
+  "/" => MulOp::Div,
+};
+
+AddOp: AddOp = {
+    "+" => AddOp::Plus,
+    "-" => AddOp::Minus,
+};
+
+MulExp: MulExp = {
+  <mulexpr: MulExp> <op: MulOp> <expr: UnaryExp> => MulExp::Mul { mulexpr: Box::new(mulexpr), op, expr: Box::new(expr) },
+  <unary: UnaryExp> => MulExp::Unary(unary),
+};
+
+AddExp: AddExp = {
+  <addexpr: AddExp> <op: AddOp> <expr: MulExp> => AddExp::Add { addexpr: Box::new(addexpr), op, expr: Box::new(expr) },
+  <unary: UnaryExp> => AddExp::Mul(MulExp::Unary(unary)),
+};
+
 
 Number: i32 = <num: IntConst> => <>;
 

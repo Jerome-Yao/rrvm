@@ -9,9 +9,11 @@ use std::fs::read_to_string;
 use std::io::Result;
 
 use crate::types::CompUnit;
+use crate::vreg::{BinOp, RegAllocator, VRegManager};
 
 mod generate;
 mod types;
+mod vreg;
 
 lalrpop_mod!(sysy);
 
@@ -50,6 +52,8 @@ fn generate_asm(program: &Program, output: &str) -> Result<()> {
         writeln!(&mut asm, "  .globl {}", name).unwrap();
         writeln!(&mut asm, "{}:", name).unwrap();
         for (&bb, node) in func_data.layout().bbs() {
+            let mut vreg_manager = VRegManager::new();
+            let allocator = RegAllocator::new();
             for &inst in node.insts().keys() {
                 let value_data = func_data.dfg().value(inst);
                 match value_data.kind() {
@@ -62,6 +66,22 @@ fn generate_asm(program: &Program, output: &str) -> Result<()> {
                                 _ => unreachable!(),
                             }
                         }
+                    }
+                    ValueKind::Binary(val) => {
+                        let op = val.op();
+                        let op = match op {
+                            koopa::ir::BinaryOp::Add => BinOp::Add,
+                            koopa::ir::BinaryOp::Sub => BinOp::Sub,
+                            koopa::ir::BinaryOp::Mul => BinOp::Mul,
+                            _ => unreachable!(),
+                        };
+                        let lr =
+                            vreg_manager.operand_reg(val.lhs(), func_data.dfg().value(val.lhs()));
+                        let rr =
+                            vreg_manager.operand_reg(val.rhs(), func_data.dfg().value(val.lhs()));
+                        let result = vreg_manager.emit_binary(op, lr, rr);
+
+                        vreg_manager.insert(inst, result);
                     }
                     _ => unreachable!(),
                 }
